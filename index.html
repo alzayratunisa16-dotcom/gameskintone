@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alyraa Color Match - Personal Color & Style Game</title>
+
+    <!-- Google Fonts: Poppins & Great Vibes for coquette accents -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- MediaPipe Face Detection Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        coquette: {
+                            50: '#fff0f3',
+                            100: '#ffe3e8',
+                            200: '#fcc2d0',
+                            300: '#f998b3',
+                            400: '#f4618e',
+                            500: '#e63973',
+                            600: '#d01b59',
+                            700: '#b00f45',
+                            text: '#4a3e3d',
+                            cream: '#fffafb',
+                            gold: '#d4af37'
+                        }
+                    },
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                        cursive: ['Great Vibes', 'cursive']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #fff0f3;
+            color: #4a3e3d;
+            overflow-x: hidden;
+            background-image: radial-gradient(#fcc2d0 0.8px, transparent 0.8px), radial-gradient(#fcc2d0 0.8px, #fff0f3 0.8px);
+            background-size: 32px 32px;
+            background-position: 0 0, 16px 16px;
+        }
+
+        /* Glassmorphism Card Style */
+        .coquette-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(252, 194, 208, 0.6);
+            box-shadow: 0 10px 30px rgba(230, 57, 115, 0.08);
+            border-radius: 2rem;
+        }
+
+        /* Coquette Buttons */
+        .btn-coquette {
+            background: linear-gradient(135deg, #f4618e 0%, #e63973 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(230, 57, 115, 0.3);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 9999px;
+        }
+
+        .btn-coquette:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(230, 57, 115, 0.4);
+        }
+
+        .btn-coquette-secondary {
+            background: #fff;
+            color: #e63973;
+            border: 2px solid #fcc2d0;
+            box-shadow: 0 4px 15px rgba(252, 194, 208, 0.4);
+            transition: all 0.3s ease;
+            border-radius: 9999px;
+        }
+
+        .btn-coquette-secondary:hover {
+            background: #ffe3e8;
+            transform: translateY(-2px);
+        }
+
+        /* Mirror Camera Frame */
+        .camera-circle-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto;
+        }
+
+        @media (min-width: 640px) {
+            .camera-circle-container {
+                width: 340px;
+                height: 340px;
+            }
+        }
+
+        .camera-circle {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 6px solid #fff;
+            box-shadow: 0 0 0 6px #fcc2d0, 0 15px 35px rgba(230, 57, 115, 0.2);
+            background: #2a2a2a;
+        }
+
+        .camera-circle video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirrored for webcam */
+        }
+
+        .camera-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Animations */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-8px) rotate(3deg); }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        @keyframes scanLaser {
+            0% { top: 0%; opacity: 0.8; }
+            50% { top: 95%; opacity: 0.8; }
+            100% { top: 0%; opacity: 0.8; }
+        }
+
+        .animate-float {
+            animation: floatSlow 4s ease-in-out infinite;
+        }
+
+        .animate-pulse-glow {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #f4618e, #fff, #f4618e, transparent);
+            box-shadow: 0 0 15px #f4618e;
+            animation: scanLaser 2s ease-in-out infinite;
+            z-index: 20;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #fff0f3;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #fcc2d0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f4618e;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative selection:bg-coquette-200 selection:text-coquette-700">
+
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-coquette-200 px-4 py-3 transition-all">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-2 cursor-pointer" onclick="app.navigateTo('landing')">
+                <div class="w-10 h-10 rounded-full bg-coquette-100 flex items-center justify-center border border-coquette-300 shadow-sm text-coquette-500">
+                    <i class="fa-solid fa-ribbon text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-semibold text-lg md:text-xl text-coquette-600 tracking-wide leading-tight">
+                        ALYRAA <span class="font-light text-coquette-400">COLOR MATCH</span>
+                    </h1>
+                    <p class="text-[10px] text-coquette-400 tracking-widest uppercase -mt-1 font-medium">Personal Color & Style</p>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex items-center gap-2 sm:gap-4">
+                <!-- Language Selector -->
+                <button onclick="app.toggleLanguage()" id="langBtn" class="px-3 py-1.5 rounded-full text-xs font-medium border border-coquette-300 bg-white hover:bg-coquette-50 text-coquette-600 flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-globe text-coquette-400"></i>
+                    <span id="langText">ID</span>
+                </button>
+
+                <!-- Admin Login Modal Trigger -->
+                <button onclick="app.showAdminModal()" class="w-9 h-9 rounded-full bg-coquette-100 hover:bg-coquette-200 text-coquette-600 flex items-center justify-center transition shadow-sm" title="Panel Admin">
+                    <i class="fa-solid fa-user-gear text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto p-4 sm:p-6 md:p-8 flex flex-col justify-center relative">
+
+        <!-- Decorative background elements -->
+        <div class="absolute top-12 left-6 text-coquette-200 text-3xl animate-float pointer-events-none opacity-60">
+            <i class="fa-solid fa-[#FFB7C5] fa-heart"></i>
+        </div>
+        <div class="absolute bottom-16 right-8 text-coquette-200 text-4xl animate-float pointer-events-none opacity-60" style="animation-delay: 1.5s;">
+            <i class="fa-solid fa-sparkles"></i>
+        </div>
+
+        <!-- ==================== VIEW 1: LANDING PAGE ==================== -->
+        <section id="view-landing" class="view-section text-center py-6 sm:py-12">
+            <div class="coquette-card p-6 sm:p-12 max-w-2xl mx-auto relative overflow-hidden">
+                <!-- Top Bow Decoration -->
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-coquette-400 text-5xl drop-shadow-md">
+                    <i class="fa-solid fa-ribbon"></i>
+                </div>
+
+                <div class="pt-6">
+                    <span class="inline-block px-4 py-1.5 rounded-full bg-coquette-100 text-coquette-600 text-xs font-semibold tracking-wider uppercase mb-4 border border-coquette-200">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Personalized Color Game
+                    </span>
+
+                    <h2 class="text-3xl sm:text-5xl font-bold text-coquette-600 mb-3 tracking-tight">
+                        ALYRAA COLOR MATCH
+                    </h2>
+
+                    <p class="font-cursive text-2xl sm:text-3xl text-coquette-500 mb-4">
+                        "Find the colors that feel like you."
+                    </p>
+
+                    <p data-i18n="landingDesc" class="text-coquette-text text-sm sm:text-base max-w-md mx-auto mb-8 leading-relaxed">
+                        Temukan personal color, karakteristik gaya unikmu, dan kombinasi warna terbaik untuk outfit, hijab, warna rambut, makeup, serta aksesori favoritmu!
+                    </p>
+
+                    <!-- CTAs -->
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button onclick="app.startCameraProcess()" class="btn-coquette px-8 py-4 text-sm sm:text-base font-semibold w-full sm:w-auto flex items-center justify-center gap-3 group">
+                            <i class="fa-solid fa-camera text-lg group-hover:rotate-12 transition-transform"></i>
+                            <span data-i18n="btnStart">MULAI PETUALANGAN WARNA</span>
+                        </button>
+
+                        <button onclick="app.showHowToPlay()" class="btn-coquette-secondary px-6 py-3.5 text-sm font-medium w-full sm:w-auto flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-question"></i>
+                            <span data-i18n="btnHowToPlay">CARA BERMAIN</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bottom decorative icons -->
+                <div class="mt-8 pt-6 border-t border-coquette-200/60 flex justify-center gap-8 text-coquette-300 text-lg">
+                    <i class="fa-solid fa-shirt" title="Outfit"></i>
+                    <i class="fa-solid fa-vest" title="Hijab"></i>
+                    <i class="fa-solid fa-scissors" title="Hair Color"></i>
+                    <i class="fa-solid fa-wand-magic" title="Makeup"></i>
+                    <i class="fa-solid fa-gem" title="Accessories"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 2: CAMERA SCAN PAGE ==================== -->
+        <section id="view-camera" class="view-section hidden text-center py-4">
+            <div class="coquette-card p-6 sm:p-8 max-w-xl mx-auto relative">
+                
+                <div class="mb-4">
+                    <h3 data-i18n="camTitle" class="text-2xl font-bold text-coquette-600 mb-1">Pindai Warna Alamimu</h3>
+                    <p data-i18n="camSubtitle" class="text-xs sm:text-sm text-coquette-text opacity-80">Posisikan wajahmu dengan lembut di dalam lingkaran bermotif pita ♡</p>
+                </div>
+
+                <!-- Hidden File Input for fallback upload -->
+                <input type="file" id="photoUploadInput" accept="image/*" class="hidden" onchange="app.handleFileUpload(event)">
+
+                <!-- Camera Mirror Container with Rich Coquette Overlay -->
+                <div class="camera-circle-container my-6">
+                    <!-- Big Bow on Top -->
+                    <div class="absolute -top-7 left-1/2 -translate-x-1/2 z-30 text-coquette-500 text-5xl filter drop-shadow-lg animate-float">
+                        <i class="fa-solid fa-ribbon"></i>
+                    </div>
+
+                    <!-- Surrounding Floral & Sparkle Decorations -->
+                    <div class="absolute top-2 -left-3 z-30 text-coquette-400 text-2xl">
+                        <i class="fa-solid fa-seedling"></i>
+                    </div>
+                    <div class="absolute top-2 -right-3 z-30 text-coquette-400 text-2xl">
+                        <i class="fa-solid fa-seedling transform -scale-x-100"></i>
+                    </div>
+                    <div class="absolute -bottom-2 left-6 z-30 text-coquette-400 text-xl">
+                        <i class="fa-solid fa-heart"></i>
+                    </div>
+                    <div class="absolute -bottom-2 right-6 z-30 text-coquette-400 text-xl">
+                        <i class="fa-solid fa-sparkles"></i>
+                    </div>
+
+                    <!-- Scanning Laser Bar (Active during processing) -->
+                    <div id="scanLine" class="scan-line hidden"></div>
+
+                    <!-- Circular Camera / Image Display Frame -->
+                    <div class="camera-circle relative flex items-center justify-center">
+                        <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                        <img id="previewImg" class="w-full h-full object-cover hidden" alt="Preview Foto">
+                        <canvas id="canvasFrame" class="hidden"></canvas>
+                    </div>
+                </div>
+
+                <!-- Realtime Detection Feedback Indicator & Camera Switch -->
+                <div class="my-4 flex flex-col items-center gap-2">
+                    <div id="detectionStatus" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-coquette-100 text-coquette-600 text-xs sm:text-sm font-medium border border-coquette-300 max-w-full text-center">
+                        <i class="fa-solid fa-spinner fa-spin text-coquette-500" id="statusIcon"></i>
+                        <span id="statusText">Mencari wajah cantikmu...</span>
+                    </div>
+
+                    <button id="btnSwitchCam" onclick="app.switchCamera()" class="hidden px-3.5 py-1.5 rounded-full text-xs font-medium bg-white border border-coquette-300 text-coquette-600 hover:bg-coquette-50 transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-camera-rotate text-coquette-500"></i> Ganti Kamera (Depan/Belakang)
+                    </button>
+                </div>
+
+                <!-- Action Scan Button -->
+                <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <button id="btnScanColors" onclick="app.executeScanAnalysis()" disabled class="btn-coquette px-8 py-3.5 text-sm sm:text-base font-semibold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed transition-all w-full sm:w-auto">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span data-i18n="btnScan">ANALISIS WARNA SAYA</span>
+                    </button>
+
+                    <!-- Fallback Upload Button -->
+                    <button onclick="document.getElementById('photoUploadInput').click()" class="btn-coquette-secondary px-5 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-2 w-full sm:w-auto">
+                        <i class="fa-solid fa-image"></i>
+                        <span>Unggah Foto</span>
+                    </button>
+                </div>
+
+                <!-- Alternative Demo Photo Button -->
+                <div class="mt-4 pt-3 border-t border-coquette-200/60">
+                    <button onclick="app.useDemoPhoto()" class="text-xs text-coquette-500 hover:text-coquette-700 underline font-medium">
+                        <i class="fa-solid fa-sparkles mr-1"></i> Tidak ada kamera? Gunakan Foto Sampel Demo
+                    </button>
+                </div>
+
+                <p class="text-[11px] text-coquette-400 mt-3">
+                    *Gunakan pencahayaan alami yang cerah atau foto wajah yang terang untuk hasil analisis optimal.
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 3: SCANNING ANIMATION OVERLAY ==================== -->
+        <div id="scanOverlay" class="fixed inset-0 bg-white/90 backdrop-blur-lg z-50 flex flex-col items-center justify-center p-6 hidden">
+            <div class="text-center max-w-sm w-full">
+                <div class="relative w-32 h-32 mx-auto mb-6">
+                    <div class="absolute inset-0 rounded-full border-4 border-coquette-200 border-t-coquette-500 animate-spin"></div>
+                    <div class="absolute inset-2 rounded-full border-2 border-dashed border-coquette-300 animate-spin" style="animation-duration: 8s; animation-direction: reverse;"></div>
+                    <div class="absolute inset-0 flex items-center justify-center text-coquette-500 text-4xl">
+                        <i class="fa-solid fa-heart animate-pulse"></i>
+                    </div>
+                </div>
+
+                <h4 class="text-xl font-bold text-coquette-600 mb-2">Mengaitkan Warna Estetikmu...</h4>
+                <p id="scanProgressText" class="text-sm text-coquette-text font-medium min-h-[2.5rem] flex items-center justify-center">
+                    Menganalisis pigmen warna kulit alami...
+                </p>
+
+                <!-- Coquette Progress Bar -->
+                <div class="w-full bg-coquette-100 rounded-full h-3 border border-coquette-200 p-0.5 overflow-hidden mt-4">
+                    <div id="scanProgressBar" class="bg-gradient-to-r from-coquette-300 to-coquette-500 h-full rounded-full transition-all duration-500" style="width: 15%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW 4: PERSONAL COLOR ANALYSIS RESULTS ==================== -->
+        <section id="view-result" class="view-section hidden space-y-6 py-4">
+            
+            <!-- Result Header Banner -->
+            <div class="coquette-card p-6 text-center relative overflow-hidden">
+                <div class="inline-block px-4 py-1 rounded-full bg-coquette-100 text-coquette-600 text-xs font-semibold uppercase tracking-wider mb-2">
+                    <i class="fa-solid fa-crown text-coquette-400 mr-1"></i> Hasil Analisis Personal Color
+                </div>
+                <h2 class="text-2xl sm:text-4xl font-bold text-coquette-600">Kartu Pesona Warnamu ♡</h2>
+                <p class="text-xs sm:text-sm text-coquette-text mt-1">Dibuat khusus berdasarkan warna kulit alami dan kecantikanmu</p>
+            </div>
+
+            <!-- Key Analysis Grid (Skin Tone, Undertone, Season) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                <!-- Skin Tone Card -->
+                <div class="coquette-card p-5 text-center flex flex-col justify-between hover:border-coquette-400 transition">
+                    <div>
+                        <div class="w-12 h-12 mx-auto rounded-full bg-coquette-100 text-coquette-500 flex items-center justify-center text-xl mb-3">
+                            <i class="fa-solid fa-sun"></i>
+                        </div>
+                        <h4 class="text-xs font-semibold text-coquette-400 uppercase tracking-wider">SKIN TONE</h4>
+                        <h3 id="resSkinTone" class="text-2xl font-bold text-coquette-600 my-1">Medium</h3>
+                        <p id="resSkinToneDesc" class="text-xs text-coquette-text leading-relaxed">Warna kulit hangat bernuansa sawo matang alami yang lembut dan bercahaya.</p>
+                    </div>
+                </div>
+
+                <!-- Undertone Card -->
+                <div class="coquette-card p-5 text-center flex flex-col justify-between border-2 border-coquette-300 hover:border-coquette-400 transition">
+                    <div>
+                        <div class="w-12 h-12 mx-auto rounded-full bg-coquette-100 text-coquette-500 flex items-center justify-center text-xl mb-3">
+                            <i class="fa-solid fa-droplet"></i>
+                        </div>
+                        <h4 class="text-xs font-semibold text-coquette-400 uppercase tracking-wider">UNDERTONE</h4>
+                        <h3 id="resUndertone" class="text-2xl font-bold text-coquette-600 my-1">COOL</h3>
+                        <p id="resUndertoneDesc" class="text-xs text-coquette-text leading-relaxed">Rona dasar kulitmu cenderung memiliki sentuhan nuansa pink, merah, atau kebiruan yang segar.</p>
+                    </div>
+                </div>
+
+                <!-- Color Season Card -->
+                <div class="coquette-card p-5 text-center flex flex-col justify-between hover:border-coquette-400 transition">
+                    <div>
+                        <div class="w-12 h-12 mx-auto rounded-full bg-coquette-100 text-coquette-500 flex items-center justify-center text-xl mb-3">
+                            <i class="fa-solid fa-leaf"></i>
+                        </div>
+                        <h4 class="text-xs font-semibold text-coquette-400 uppercase tracking-wider">COLOR SEASON</h4>
+                        <h3 id="resSeason" class="text-2xl font-bold text-coquette-600 my-1">SUMMER</h3>
+                        <p id="resSeasonDesc" class="text-xs text-coquette-text leading-relaxed">Karakteristik warna yang lembut, bernuansa dingin, anggun, dan sangat serasi dengan warna pastel.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Karakteristik & Ciri Khas (Signature Card) -->
+            <div class="coquette-card p-6 sm:p-8 bg-gradient-to-br from-white/90 to-coquette-50/90 border-2 border-coquette-300">
+                <div class="flex items-center gap-3 mb-4">
+                    <i class="fa-solid fa-ribbon text-2xl text-coquette-500"></i>
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-bold text-coquette-600">Karakteristik & Ciri Khas Warna</h3>
+                        <p class="text-xs text-coquette-400">Your Color Characteristics & Signature Style</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <!-- Characteristics Bullets -->
+                    <div class="bg-white/80 p-4 rounded-2xl border border-coquette-200">
+                        <h4 class="text-xs font-bold text-coquette-500 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-star text-coquette-400 mr-1"></i> Color Characteristics
+                        </h4>
+                        <ul id="resCharacteristicsList" class="space-y-1.5 text-xs sm:text-sm text-coquette-text">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+
+                    <!-- Signature Statement -->
+                    <div class="bg-coquette-100/60 p-4 rounded-2xl border border-coquette-200 flex flex-col justify-center">
+                        <h4 class="text-xs font-bold text-coquette-500 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-signature text-coquette-400 mr-1"></i> Your Color Signature
+                        </h4>
+                        <p id="resSignatureText" class="text-xs sm:text-sm font-medium italic text-coquette-600 leading-relaxed">
+                            "Warna-warna lembut, segar, dan berkesan anggun secara alami menyempurnakan rona kecantikanmu."
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Color Palette (8-12 Color Swatches) -->
+            <div class="coquette-card p-6 sm:p-8">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-coquette-600">Palet Warna Utama (Your Signature Colors)</h3>
+                        <p class="text-xs text-coquette-text">Warna-warna yang dipastikan membuat penampilanmu makin bersinar!</p>
+                    </div>
+                    <span class="text-xs px-3 py-1 bg-coquette-100 text-coquette-600 rounded-full font-medium self-start sm:self-auto border border-coquette-200">
+                        <i class="fa-solid fa-palette mr-1"></i> 8 - 12 Pilihan Terbaik
+                    </span>
+                </div>
+
+                <!-- Swatches Grid -->
+                <div id="resPaletteSwatches" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 sm:gap-4">
+                    <!-- Dynamic Swatches -->
+                </div>
+            </div>
+
+            <!-- Rich Style Recommendations (Outfit, Hijab, Hair, Makeup, Accessories, Combinations) -->
+            <div class="coquette-card p-6 sm:p-8">
+                <h3 class="text-xl font-bold text-coquette-600 mb-6 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-coquette-500"></i>
+                    Rekomendasi Gaya & Warna Lengkap
+                </h3>
+
+                <!-- Recommendation Tabs -->
+                <div class="flex flex-wrap gap-2 border-b border-coquette-200 pb-4 mb-6">
+                    <button onclick="app.switchRecTab('outfit')" id="tabBtn-outfit" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-500 text-white shadow-sm">
+                        <i class="fa-solid fa-shirt mr-1"></i> Outfit
+                    </button>
+                    <button onclick="app.switchRecTab('hijab')" id="tabBtn-hijab" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-100 text-coquette-600 hover:bg-coquette-200">
+                        <i class="fa-solid fa-vest mr-1"></i> Hijab
+                    </button>
+                    <button onclick="app.switchRecTab('hair')" id="tabBtn-hair" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-100 text-coquette-600 hover:bg-coquette-200">
+                        <i class="fa-solid fa-scissors mr-1"></i> Warna Rambut
+                    </button>
+                    <button onclick="app.switchRecTab('makeup')" id="tabBtn-makeup" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-100 text-coquette-600 hover:bg-coquette-200">
+                        <i class="fa-solid fa-wand-magic mr-1"></i> Makeup
+                    </button>
+                    <button onclick="app.switchRecTab('acc')" id="tabBtn-acc" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-100 text-coquette-600 hover:bg-coquette-200">
+                        <i class="fa-solid fa-gem mr-1"></i> Aksesori
+                    </button>
+                    <button onclick="app.switchRecTab('combo')" id="tabBtn-combo" class="rec-tab-btn px-4 py-2 rounded-full text-xs font-semibold bg-coquette-100 text-coquette-600 hover:bg-coquette-200">
+                        <i class="fa-solid fa-layer-group mr-1"></i> Kombinasi Warna
+                    </button>
+                </div>
+
+                <!-- Tab Contents Container -->
+                <div id="recTabContainer">
+                    <!-- Dynamic Recommendation Content Populated by JS -->
+                </div>
+            </div>
+
+            <!-- CTA to Challenge Game -->
+            <div class="text-center pt-4">
+                <button onclick="app.startColorChallenge()" class="btn-coquette px-10 py-4 text-base font-bold shadow-lg animate-pulse-glow flex items-center gap-3 mx-auto">
+                    <i class="fa-solid fa-gamepad text-xl"></i>
+                    <span>MULAI TANTANGAN WARNA (COLOR CHALLENGE)</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 5: COLOR CHALLENGE MINI GAME ==================== -->
+        <section id="view-challenge" class="view-section hidden py-4">
+            <div class="coquette-card p-6 sm:p-8 max-w-2xl mx-auto relative">
+                
+                <!-- Challenge Header -->
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-coquette-200">
+                    <div>
+                        <span class="text-xs font-semibold text-coquette-500 uppercase tracking-wider">COLOR CHALLENGE</span>
+                        <h3 class="text-lg sm:text-xl font-bold text-coquette-600" id="challengeTitle">Tantangan Warna #1</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-coquette-400">Skor Saat Ini</span>
+                        <div class="text-xl font-bold text-coquette-600" id="currentScoreDisplay">0</div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-xs text-coquette-400 mb-1">
+                        <span id="challengeProgressText">Tantangan 1 / 5</span>
+                        <span id="challengePercent">20%</span>
+                    </div>
+                    <div class="w-full bg-coquette-100 rounded-full h-2.5 overflow-hidden border border-coquette-200">
+                        <div id="challengeProgressBar" class="bg-coquette-500 h-full rounded-full transition-all duration-300" style="width: 20%"></div>
+                    </div>
+                </div>
+
+                <!-- Question Box -->
+                <div class="bg-white/90 p-5 rounded-2xl border border-coquette-200 shadow-sm mb-6">
+                    <p id="challengeQuestion" class="text-base sm:text-lg font-semibold text-coquette-600 text-center">
+                        Warna mana yang paling harmonis dengan undertone dingin (Cool Undertone)?
+                    </p>
+                </div>
+
+                <!-- Options List -->
+                <div id="challengeOptions" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                    <!-- Dynamic Options -->
+                </div>
+
+                <!-- Feedback & Explanation Modal/Box -->
+                <div id="challengeFeedback" class="hidden p-4 rounded-2xl border mb-6 text-xs sm:text-sm leading-relaxed">
+                    <!-- Dynamic Feedback -->
+                </div>
+
+                <!-- Next Button -->
+                <div class="flex justify-end">
+                    <button id="btnNextChallenge" onclick="app.nextChallengeQuestion()" disabled class="btn-coquette px-6 py-2.5 text-sm font-semibold opacity-50 cursor-not-allowed">
+                        <span>Lanjut Tantangan</span> <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 6: SCORE & ACHIEVEMENT RESULT ==================== -->
+        <section id="view-score" class="view-section hidden text-center py-6">
+            <div class="coquette-card p-6 sm:p-10 max-w-2xl mx-auto relative overflow-hidden">
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-coquette-400 text-5xl">
+                    <i class="fa-solid fa-ribbon"></i>
+                </div>
+
+                <div class="pt-4">
+                    <span class="text-xs font-semibold text-coquette-500 uppercase tracking-widest bg-coquette-100 px-3 py-1 rounded-full border border-coquette-200">TANTANGAN SELESAI</span>
+                    <h2 class="text-3xl font-bold text-coquette-600 mt-2 mb-1">SKOR COLOR MATCH KAMU</h2>
+                    <p class="text-xs text-coquette-text mb-6">Hebat! Kamu telah menyelesaikan semua tantangan pengetahuan warna.</p>
+
+                    <!-- Animated Score Circle -->
+                    <div class="w-36 h-36 mx-auto rounded-full bg-gradient-to-tr from-coquette-100 to-coquette-200 border-4 border-coquette-300 flex flex-col items-center justify-center shadow-inner mb-6 animate-float">
+                        <span id="finalScoreVal" class="text-4xl sm:text-5xl font-extrabold text-coquette-600">0</span>
+                        <span class="text-xs text-coquette-500 font-medium">/ 50 POIN</span>
+                    </div>
+
+                    <!-- Unlocked Achievement Badge -->
+                    <div class="bg-white/80 p-5 rounded-2xl border border-coquette-200 max-w-md mx-auto mb-8 shadow-sm">
+                        <span class="text-[10px] font-bold text-coquette-400 uppercase tracking-wider">PENCAPAIAN YANG DIRAIH</span>
+                        <div id="achievementBadge" class="mt-2 flex items-center justify-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-coquette-500 text-white flex items-center justify-center text-xl shadow-md">
+                                <i class="fa-solid fa-award"></i>
+                            </div>
+                            <div class="text-left">
+                                <h4 id="badgeTitle" class="text-base font-bold text-coquette-600">COLOR EXPLORER</h4>
+                                <p id="badgeDesc" class="text-xs text-coquette-text">Kamu telah mengenal dasar-dasar warna pesonamu!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button onclick="app.showFullSummaryJourney()" class="btn-coquette px-6 py-3 text-sm font-semibold w-full sm:w-auto">
+                            <i class="fa-solid fa-scroll mr-1"></i> LIHAT RANGKUMAN GAYA KAMU
+                        </button>
+                        <button onclick="app.restartGame()" class="btn-coquette-secondary px-6 py-3 text-sm font-medium w-full sm:w-auto">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> PINDAI ULANG
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 7: FULL SUMMARY JOURNEY CARD ==================== -->
+        <section id="view-journey" class="view-section hidden py-4">
+            <div class="coquette-card p-6 sm:p-10 max-w-3xl mx-auto" id="printableJourney">
+                <div class="text-center border-b border-coquette-200 pb-6 mb-6">
+                    <i class="fa-solid fa-ribbon text-3xl text-coquette-500 mb-2"></i>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-coquette-600">ALYRAA COLOR JOURNEY</h2>
+                    <p class="text-xs text-coquette-text">Panduan Lengkap Warna & Gaya Personal Kamu</p>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-6">
+                    <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                        <span class="text-[10px] text-coquette-400 uppercase font-bold">Skin Tone</span>
+                        <div id="sumSkinTone" class="font-bold text-coquette-600 text-sm sm:text-base">Medium</div>
+                    </div>
+                    <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                        <span class="text-[10px] text-coquette-400 uppercase font-bold">Undertone</span>
+                        <div id="sumUndertone" class="font-bold text-coquette-600 text-sm sm:text-base">COOL</div>
+                    </div>
+                    <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                        <span class="text-[10px] text-coquette-400 uppercase font-bold">Season</span>
+                        <div id="sumSeason" class="font-bold text-coquette-600 text-sm sm:text-base">SUMMER</div>
+                    </div>
+                    <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                        <span class="text-[10px] text-coquette-400 uppercase font-bold">Badge Skor</span>
+                        <div id="sumScoreBadge" class="font-bold text-coquette-600 text-sm sm:text-base">40/50</div>
+                    </div>
+                </div>
+
+                <div class="space-y-4 text-xs sm:text-sm text-coquette-text">
+                    <div class="bg-white p-4 rounded-xl border border-coquette-200">
+                        <h4 class="font-bold text-coquette-600 mb-1"><i class="fa-solid fa-signature text-coquette-400 mr-1"></i> Signature Style:</h4>
+                        <p id="sumSignature" class="italic">"Soft, fresh and elegant colors naturally complement your coloring."</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl border border-coquette-200">
+                        <h4 class="font-bold text-coquette-600 mb-2"><i class="fa-solid fa-palette text-coquette-400 mr-1"></i> Rekomendasi Utama Singkat:</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div><strong class="text-coquette-500">Outfit:</strong> <span id="sumOutfitBrief">Baby Pink, Dusty Rose, Soft Grey</span></div>
+                            <div><strong class="text-coquette-500">Hijab:</strong> <span id="sumHijabBrief">Lavender, Soft Plum, Powder Blue</span></div>
+                            <div><strong class="text-coquette-500">Rambut:</strong> <span id="sumHairBrief">Ash Brown, Dark Mauve, Cool Black</span></div>
+                            <div><strong class="text-coquette-500">Makeup:</strong> <span id="sumMakeupBrief">Berry Lipstick, Soft Pink Blush</span></div>
+                            <div><strong class="text-coquette-500">Aksesori:</strong> <span id="sumAccBrief">Silver, White Gold, Rose Gold</span></div>
+                            <div><strong class="text-coquette-500">Kombinasi:</strong> <span id="sumComboBrief">Baby Pink + Soft Grey</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+                    <button onclick="window.print()" class="btn-coquette px-6 py-2.5 text-xs font-semibold">
+                        <i class="fa-solid fa-print mr-1"></i> CETAK / SIMPAN RESUME
+                    </button>
+                    <button onclick="app.navigateTo('landing')" class="btn-coquette-secondary px-6 py-2.5 text-xs font-semibold">
+                        <i class="fa-solid fa-house mr-1"></i> KEMBALI KE UTAMA
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- How To Play Modal -->
+    <div id="modalHowToPlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="coquette-card p-6 max-w-md w-full relative">
+            <button onclick="app.closeModal('modalHowToPlay')" class="absolute top-4 right-4 text-coquette-400 hover:text-coquette-600 text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-xl font-bold text-coquette-600 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-coquette-500"></i> Cara Bermain
+            </h3>
+            <ol class="list-decimal list-inside space-y-2 text-xs sm:text-sm text-coquette-text leading-relaxed">
+                <li>Klik tombol <strong>START YOUR COLOR JOURNEY</strong>.</li>
+                <li>Gunakan kamera langsung atau **unggah foto wajah** pilihanmu.</li>
+                <li>Tekan tombol <strong>ANALISIS WARNA SAYA</strong> untuk mendeteksi undertone dan skin tone secara otomatis.</li>
+                <li>Dapatkan rekomendasi lengkap outfit, hijab, warna rambut, makeup, dan aksesori.</li>
+                <li>Mainkan 5 kuis interaktif di <strong>Color Challenge</strong> untuk menguji pengetahuan warna dan kumpulkan poinnya!</li>
+            </ol>
+            <div class="mt-6 text-center">
+                <button onclick="app.closeModal('modalHowToPlay')" class="btn-coquette px-6 py-2 text-xs font-semibold">
+                    Saya Mengerti ♡
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="modalAdminLogin" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="coquette-card p-6 max-w-sm w-full relative">
+            <button onclick="app.closeModal('modalAdminLogin')" class="absolute top-4 right-4 text-coquette-400 hover:text-coquette-600 text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-lg font-bold text-coquette-600 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-lock text-coquette-500"></i> Admin Login
+            </h3>
+            <form onsubmit="app.handleAdminLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-coquette-500 mb-1">Username</label>
+                    <input type="text" id="adminUser" required placeholder="admin" class="w-full px-3 py-2 rounded-xl border border-coquette-300 text-xs focus:outline-none focus:border-coquette-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-coquette-500 mb-1">Password</label>
+                    <input type="password" id="adminPass" required placeholder="••••••••" class="w-full px-3 py-2 rounded-xl border border-coquette-300 text-xs focus:outline-none focus:border-coquette-500">
+                </div>
+                <button type="submit" class="btn-coquette w-full py-2.5 text-xs font-semibold mt-2">
+                    MASUK KE DASHBOARD
+                </button>
+            </form>
+            <p class="text-[10px] text-center text-coquette-400 mt-3">Default: admin / alyraa123</p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Modal -->
+    <div id="modalAdminDashboard" class="fixed inset-0 bg-black/50 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="coquette-card p-6 max-w-4xl w-full h-[85vh] flex flex-col relative overflow-hidden">
+            <div class="flex items-center justify-between pb-4 border-b border-coquette-200">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield text-coquette-500 text-xl"></i>
+                    <h3 class="text-lg font-bold text-coquette-600">Panel Pengelola Konten Alyraa</h3>
+                </div>
+                <button onclick="app.closeModal('modalAdminDashboard')" class="text-coquette-400 hover:text-coquette-600 text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Admin Stats Summary Row -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 my-4">
+                <div class="bg-coquette-100 p-2.5 rounded-xl text-center border border-coquette-200">
+                    <span class="text-[10px] font-bold text-coquette-400 uppercase">Skin Tones</span>
+                    <div id="admStatSkin" class="text-base font-bold text-coquette-600">5</div>
+                </div>
+                <div class="bg-coquette-100 p-2.5 rounded-xl text-center border border-coquette-200">
+                    <span class="text-[10px] font-bold text-coquette-400 uppercase">Undertones</span>
+                    <div id="admStatUnder" class="text-base font-bold text-coquette-600">3</div>
+                </div>
+                <div class="bg-coquette-100 p-2.5 rounded-xl text-center border border-coquette-200">
+                    <span class="text-[10px] font-bold text-coquette-400 uppercase">Total Warna</span>
+                    <div id="admStatColor" class="text-base font-bold text-coquette-600">48</div>
+                </div>
+                <div class="bg-coquette-100 p-2.5 rounded-xl text-center border border-coquette-200">
+                    <span class="text-[10px] font-bold text-coquette-400 uppercase">Rekomendasi</span>
+                    <div id="admStatRec" class="text-base font-bold text-coquette-600">120+</div>
+                </div>
+                <div class="bg-coquette-100 p-2.5 rounded-xl text-center border border-coquette-200 col-span-2 sm:col-span-1">
+                    <span class="text-[10px] font-bold text-coquette-400 uppercase">Challenges</span>
+                    <div id="admStatQuiz" class="text-base font-bold text-coquette-600">5</div>
+                </div>
+            </div>
+
+            <!-- Admin Management Tabs & Content -->
+            <div class="flex-grow flex flex-col sm:flex-row gap-4 overflow-hidden">
+                <!-- Admin Sidebar Navigation -->
+                <div class="w-full sm:w-48 bg-coquette-50/80 p-2 rounded-2xl border border-coquette-200 flex sm:flex-col gap-1 overflow-x-auto sm:overflow-y-auto">
+                    <button onclick="app.switchAdminTab('skintones')" class="adm-tab-btn active px-3 py-2 rounded-xl text-xs font-semibold text-left w-full bg-coquette-500 text-white">Skin Tone</button>
+                    <button onclick="app.switchAdminTab('undertones')" class="adm-tab-btn px-3 py-2 rounded-xl text-xs font-semibold text-left w-full hover:bg-coquette-100 text-coquette-600">Undertone</button>
+                    <button onclick="app.switchAdminTab('haircolors')" class="adm-tab-btn px-3 py-2 rounded-xl text-xs font-semibold text-left w-full hover:bg-coquette-100 text-coquette-600">Warna Rambut</button>
+                    <button onclick="app.switchAdminTab('challenges')" class="adm-tab-btn px-3 py-2 rounded-xl text-xs font-semibold text-left w-full hover:bg-coquette-100 text-coquette-600">Quiz Challenges</button>
+                </div>
+
+                <!-- Admin Editor Area -->
+                <div class="flex-grow bg-white/80 p-4 rounded-2xl border border-coquette-200 overflow-y-auto" id="adminEditorArea">
+                    <!-- Dynamic Admin Content -->
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-coquette-200 flex justify-between items-center">
+                <button onclick="app.resetAdminDatabase()" class="text-xs text-red-500 hover:underline">
+                    <i class="fa-solid fa-arrows-rotate mr-1"></i> Reset Data Default
+                </button>
+                <button onclick="app.closeModal('modalAdminDashboard')" class="btn-coquette px-4 py-1.5 text-xs font-semibold">
+                    Tutup Dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white/60 border-t border-coquette-200 py-3 px-4 text-center text-xs text-coquette-400">
+        <p>Alyraa Color Match &copy; 2026. Designed with ♡ for Personal Color & Style Enthusiasts.</p>
+    </footer>
+
+    <script>
+        /**
+         * ALYRAA COLOR MATCH - SINGLE FILE GAME ENGINE
+         */
+
+        // Initial Data Store
+        const DEFAULT_DATABASE = {
+            skinTones: [
+                { id: 'fair', name: 'Fair', desc: 'Sangat cerah dengan porsi pigmen alami yang lembut.' },
+                { id: 'light', name: 'Light', desc: 'Kulit cerah alami yang mudah menyesuaikan rona lembut.' },
+                { id: 'medium', name: 'Medium', desc: 'Rona sawo matang atau kuning langsat alami khas Asia.' },
+                { id: 'tan', name: 'Tan', desc: 'Eksotis hangat berpigmen keemasan yang menawan.' },
+                { id: 'deep', name: 'Deep', desc: 'Pigmen dalam kaya kecantikan eksotis yang kontras nan anggun.' }
+            ],
+            undertones: {
+                COOL: {
+                    name: 'COOL',
+                    desc: 'Rona dasar kulitmu cenderung memiliki sentuhan nuansa pink, merah, atau kebiruan yang segar.',
+                    characteristics: [
+                        'Cool & Fresh base',
+                        'Soft & Pink/Blue-based pigments',
+                        'Tampak sangat segar pada nuansa dingin pastel',
+                        'Serasi dengan perhiasan Silver & White Gold'
+                    ],
+                    signature: 'Warna-warna lembut, segar, dan berkesan anggun secara alami menyempurnakan rona kecantikanmu.',
+                    season: 'SUMMER / WINTER',
+                    seasonDesc: 'Karakteristik dingin yang anggun, kontras lembut hingga tajam yang menawan.',
+                    palette: [
+                        { name: 'Baby Pink', hex: '#F4C2C2' },
+                        { name: 'Dusty Rose', hex: '#DCAE96' },
+                        { name: 'Lavender', hex: '#E6E6FA' },
+                        { name: 'Powder Blue', hex: '#B0E0E6' },
+                        { name: 'Mauve', hex: '#E0B0FF' },
+                        { name: 'Soft Grey', hex: '#D3D3D3' },
+                        { name: 'Berry', hex: '#8A2BE2' },
+                        { name: 'Navy Blue', hex: '#000080' },
+                        { name: 'Cool Emerald', hex: '#00A86B' },
+                        { name: 'Plum', hex: '#dda0dd' }
+                    ],
+                    recommendations: {
+                        outfit: ['Baby Pink', 'Dusty Rose', 'Soft Grey', 'Navy Blue', 'Lavender', 'Powder Blue', 'Magenta Soft'],
+                        hijab: ['Lavender', 'Dusty Pink', 'Soft Plum', 'Powder Blue', 'Light Ash Grey', 'Berry Cool'],
+                        hair: ['Ash Brown', 'Cool Dark Brown', 'Plum Mahogany', 'Ash Platinum', 'Dark Berry Black'],
+                        makeup: {
+                            lipstick: 'Cool Rose, Berry Pink, Pinky Nude',
+                            blush: 'Soft Cool Pink, Mauve',
+                            eyeshadow: 'Silver Taupe, Cool Lavender, Ash Charcoal',
+                            foundation: 'Pink / Neutral undertone shade'
+                        },
+                        accessories: ['Silver', 'White Gold', 'Platinum', 'Rose Gold (Soft)'],
+                        combinations: [
+                            { pair: ['Baby Pink', 'Soft Grey'], hexes: ['#F4C2C2', '#D3D3D3'] },
+                            { pair: ['Dusty Rose', 'Navy Blue'], hexes: ['#DCAE96', '#000080'] },
+                            { pair: ['Lavender', 'Powder Blue'], hexes: ['#E6E6FA', '#B0E0E6'] }
+                        ]
+                    }
+                },
+                WARM: {
+                    name: 'WARM',
+                    desc: 'Rona dasar kulitmu cenderung memiliki sentuhan keemasan, peach, atau kekuningan yang kaya.',
+                    characteristics: [
+                        'Warm & Golden base',
+                        'Peachy & Earthy tones',
+                        'Harmonis alami dengan sentuhan nuansa bumi yang hangat',
+                        'Sangat bersinar mengenakan perhiasan Gold & Yellow Gold'
+                    ],
+                    signature: 'Warna-warna hangat, bercahaya keemasan, dan bernuansa hangat bumi secara alami memancarkan pesonamu.',
+                    season: 'SPRING / AUTUMN',
+                    seasonDesc: 'Karakteristik hangat kaya warna keemasan dan keceriaan musim gugur.',
+                    palette: [
+                        { name: 'Peach', hex: '#FFDAB9' },
+                        { name: 'Warm Coral', hex: '#FF7F50' },
+                        { name: 'Terracotta', hex: '#E2725B' },
+                        { name: 'Mustard Yellow', hex: '#FFDB58' },
+                        { name: 'Olive Green', hex: '#808000' },
+                        { name: 'Warm Beige', hex: '#F5F5DC' },
+                        { name: 'Rust Brown', hex: '#B7410E' },
+                        { name: 'Warm Brick', hex: '#960018' },
+                        { name: 'Golden Apricot', hex: '#FBCEB1' },
+                        { name: 'Moss Green', hex: '#8A9A5B' }
+                    ],
+                    recommendations: {
+                        outfit: ['Peach', 'Warm Coral', 'Terracotta', 'Olive Green', 'Warm Beige', 'Mustard', 'Cream White'],
+                        hijab: ['Warm Nude', 'Golden Peach', 'Terracotta Soft', 'Olive Khaki', 'Warm Camel'],
+                        hair: ['Golden Brown', 'Warm Chestnut', 'Honey Blonde', 'Auburn Copper', 'Warm Espresso'],
+                        makeup: {
+                            lipstick: 'Peach Coral, Warm Brick Red, Warm Nude',
+                            blush: 'Peachy Coral, Warm Bronze',
+                            eyeshadow: 'Warm Copper, Golden Gold, Terracotta Earth',
+                            foundation: 'Yellow / Warm Olive shade'
+                        },
+                        accessories: ['Gold (Yellow)', 'Bronze', 'Brass', 'Warm Rose Gold'],
+                        combinations: [
+                            { pair: ['Peach', 'Warm Beige'], hexes: ['#FFDAB9', '#F5F5DC'] },
+                            { pair: ['Terracotta', 'Olive Green'], hexes: ['#E2725B', '#808000'] },
+                            { pair: ['Warm Coral', 'Cream White'], hexes: ['#FF7F50', '#FFFDD0'] }
+                        ]
+                    }
+                },
+                NEUTRAL: {
+                    name: 'NEUTRAL',
+                    desc: 'Rona dasar kulitmu memiliki keseimbangan sempurna antara karakter hangat dan dingin.',
+                    characteristics: [
+                        'Balanced & Flexible coloring',
+                        'Soft contrast adaptation',
+                        'Bisa memakai warna hangat maupun dingin dengan fleksibel',
+                        'Tampak anggun memakai perhiasan Gold maupun Silver'
+                    ],
+                    signature: 'Keseimbangan warna alami memberikanmu kebebasan dan fleksibilitas mengeksplorasi ragam warna.',
+                    season: 'SOFT AUTUMN / SOFT SUMMER',
+                    seasonDesc: 'Perpaduan lembut yang sangat fleksibel dan berkelas.',
+                    palette: [
+                        { name: 'Dusty Pink', hex: '#DCAE96' },
+                        { name: 'Jade Green', hex: '#00A86B' },
+                        { name: 'Teal', hex: '#008080' },
+                        { name: 'Rose Gold', hex: '#B76E79' },
+                        { name: 'Soft Cream', hex: '#FFFDD0' },
+                        { name: 'Muted Ruby', hex: '#C08081' },
+                        { name: 'Taupe', hex: '#483C32' },
+                        { name: 'Soft Denim', hex: '#7997A1' },
+                        { name: 'Warm Charcoal', hex: '#36454F' },
+                        { name: 'Blush Nude', hex: '#DEB887' }
+                    ],
+                    recommendations: {
+                        outfit: ['Dusty Pink', 'Teal', 'Jade Green', 'Soft Cream', 'Muted Ruby', 'Rose Beige', 'Denim Blue'],
+                        hijab: ['Rose Nude', 'Soft Taupe', 'Sage Green', 'Dusty Mauve', 'Muted Terracotta'],
+                        hair: ['Natural Dark Brown', 'Soft Chocolate', 'Muted Ash Brown', 'Medium Chestnut'],
+                        makeup: {
+                            lipstick: 'Rose Nude, Muted Rose, Dusty Coral',
+                            blush: 'Peachy Pink, Rosewood',
+                            eyeshadow: 'Soft Rose Gold, Neutral Bronze, Taupe',
+                            foundation: 'Neutral / Balanced Beige shade'
+                        },
+                        accessories: ['Rose Gold', 'Silver', 'Gold', 'Mixed Metals'],
+                        combinations: [
+                            { pair: ['Dusty Pink', 'Taupe'], hexes: ['#DCAE96', '#483C32'] },
+                            { pair: ['Teal', 'Soft Cream'], hexes: ['#008080', '#FFFDD0'] },
+                            { pair: ['Jade Green', 'Rose Gold'], hexes: ['#00A86B', '#B76E79'] }
+                        ]
+                    }
+                }
+            },
+            challenges: [
+                {
+                    id: 1,
+                    question: "Warna mana yang paling harmonis dan mencerahkan untuk undertone dingin (COOL)?",
+                    options: [
+                        { text: "Mustard Keemasan", correct: false, exp: "Warna Mustard lebih cocok untuk Warm Undertone." },
+                        { text: "Lavender / Baby Pink", correct: true, exp: "Tepat sekali! Warna berdasar kebiruan/pink seperti Lavender sangat serasi untuk Cool Undertone." },
+                        { text: "Orange Terracotta", correct: false, exp: "Terracotta memiliki rona sangat hangat." },
+                        { text: "Cokelat Bata", correct: false, exp: "Cokelat bata tergolong palette Warm Autumn." }
+                    ]
+                },
+                {
+                    id: 2,
+                    question: "Untuk kamu yang memiliki WARM undertone, perhiasan mana yang paling bersinar di kulitmu?",
+                    options: [
+                        { text: "Silver Murni", correct: false, exp: "Silver lebih memancarkan rona Cool Undertone." },
+                        { text: "Emas Keemasan (Yellow Gold)", correct: true, exp: "Benar! Kilau Yellow Gold melengkapi rona hangat keemasan kulitmu." },
+                        { text: "Platinum Dingin", correct: false, exp: "Platinum kontras dingin." },
+                        { text: "Titanium Abu-abu", correct: false, exp: "Titanium kurang memberikan kilau hangat." }
+                    ]
+                },
+                {
+                    id: 3,
+                    question: "Kombinasi warna hijab & outfit mana yang paling tepat untuk kategori 'Soft & Elegant'?",
+                    options: [
+                        { text: "Baby Pink + Soft Grey", correct: true, exp: "Sempurna! Perpaduan Baby Pink dan Soft Grey memberikan nuansa sangat anggun & seimbang." },
+                        { text: "Neon Green + Orange", correct: false, exp: "Kontras ini terlalu tajam untuk kesan soft." },
+                        { text: "Hitam Pekat + Kuning Terang", correct: false, exp: "Kombinasi ini terlalu tinggi tingkat kontrasnya." },
+                        { text: "Cokelat Tua + Merah Cabai", correct: false, exp: "Kombinasi berat yang kurang harmonis." }
+                    ]
+                },
+                {
+                    id: 4,
+                    question: "Warna lipstick apa yang paling cocok dipasangkan pada undertone NEUTRAL?",
+                    options: [
+                        { text: "Orange Terang", correct: false, exp: "Orange terlalu bernuansa hangat ekstrim." },
+                        { text: "Rose Nude / Muted Pink", correct: true, exp: "Tepat! Rose Nude menjaga keseimbangan rona alami undertone neutral." },
+                        { text: "Ungu Gelap Pekat", correct: false, exp: "Terlalu mendominasi rona netral." },
+                        { text: "Neon Coral", correct: false, exp: "Neon coral terlalu kontras mencolok." }
+                    ]
+                },
+                {
+                    id: 5,
+                    question: "Pilihan warna hijab mana yang serasi untuk pemilik personal color WARM undertone?",
+                    options: [
+                        { text: "Warm Nude & Khaki Olive", correct: true, exp: "Hebat! Warna-warna bernuansa bumi hangat akan membuat wajah tampak merona segar." },
+                        { text: "Ice Blue Dingin", correct: false, exp: "Ice Blue adalah warna khas Cool Winter." },
+                        { text: "Silver Grey", correct: false, exp: "Silver Grey tergolong palette warna dingin." },
+                        { text: "Magenta Pekat", correct: false, exp: "Magenta tergolong tone dingin berdasar biru." }
+                    ]
+                }
+            ]
+        };
+
+        class AlyraaApp {
+            constructor() {
+                this.db = this.loadDatabase();
+                this.currentLang = 'id';
+                this.userAnalysis = null;
+                this.challengeIndex = 0;
+                this.challengeScore = 0;
+                this.webcamStream = null;
+                this.facingMode = 'user';
+                this.faceDetected = false;
+                this.activeRecTab = 'outfit';
+                this.activeAdminTab = 'skintones';
+            }
+
+            init() {
+                this.navigateTo('landing');
+            }
+
+            loadDatabase() {
+                const stored = localStorage.getItem('ALYRAA_DB');
+                if (stored) {
+                    try { return JSON.parse(stored); } catch (e) {}
+                }
+                localStorage.setItem('ALYRAA_DB', JSON.stringify(DEFAULT_DATABASE));
+                return DEFAULT_DATABASE;
+            }
+
+            saveDatabase() {
+                localStorage.setItem('ALYRAA_DB', JSON.stringify(this.db));
+            }
+
+            resetAdminDatabase() {
+                this.db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+                this.saveDatabase();
+                alert('Database berhasil direset ke kondisi default!');
+                this.renderAdminEditor();
+            }
+
+            toggleLanguage() {
+                this.currentLang = this.currentLang === 'id' ? 'en' : 'id';
+                document.getElementById('langText').innerText = this.currentLang.toUpperCase();
+            }
+
+            navigateTo(viewId) {
+                document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('hidden'));
+                const target = document.getElementById(`view-${viewId}`);
+                if (target) {
+                    target.classList.remove('hidden');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+
+                if (viewId !== 'camera' && this.webcamStream) {
+                    this.stopCamera();
+                }
+            }
+
+            showHowToPlay() {
+                document.getElementById('modalHowToPlay').classList.remove('hidden');
+            }
+
+            showAdminModal() {
+                document.getElementById('modalAdminLogin').classList.remove('hidden');
+            }
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.add('hidden');
+            }
+
+            handleAdminLogin(e) {
+                e.preventDefault();
+                const user = document.getElementById('adminUser').value;
+                const pass = document.getElementById('adminPass').value;
+                if (user === 'admin' && pass === 'alyraa123') {
+                    this.closeModal('modalAdminLogin');
+                    this.openAdminDashboard();
+                } else {
+                    alert('Username atau password admin salah!');
+                }
+            }
+
+            openAdminDashboard() {
+                document.getElementById('modalAdminDashboard').classList.remove('hidden');
+                this.updateAdminStats();
+                this.renderAdminEditor();
+            }
+
+            updateAdminStats() {
+                document.getElementById('admStatSkin').innerText = this.db.skinTones.length;
+                document.getElementById('admStatUnder').innerText = Object.keys(this.db.undertones).length;
+                document.getElementById('admStatColor').innerText = 30;
+                document.getElementById('admStatRec').innerText = 120;
+                document.getElementById('admStatQuiz').innerText = this.db.challenges.length;
+            }
+
+            switchAdminTab(tab) {
+                this.activeAdminTab = tab;
+                document.querySelectorAll('.adm-tab-btn').forEach(btn => {
+                    btn.classList.remove('bg-coquette-500', 'text-white');
+                    btn.classList.add('hover:bg-coquette-100', 'text-coquette-600');
+                });
+                event.target.classList.add('bg-coquette-500', 'text-white');
+                this.renderAdminEditor();
+            }
+
+            renderAdminEditor() {
+                const container = document.getElementById('adminEditorArea');
+                if (this.activeAdminTab === 'skintones') {
+                    let html = '<h4 class="font-bold text-coquette-600 mb-3 text-sm">Kelola Skin Tone</h4><div class="space-y-2">';
+                    this.db.skinTones.forEach((st, idx) => {
+                        html += `
+                            <div class="p-2 border border-coquette-200 rounded-xl flex items-center justify-between text-xs bg-white">
+                                <div><strong>${st.name}</strong> - ${st.desc}</div>
+                                <button onclick="app.deleteSkinTone(${idx})" class="text-red-500 hover:text-red-700 px-2"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        `;
+                    });
+                    html += `</div>
+                        <div class="mt-4 pt-3 border-t border-coquette-200 flex gap-2">
+                            <input id="newStName" placeholder="Nama Skin Tone" class="px-2 py-1 border rounded text-xs">
+                            <input id="newStDesc" placeholder="Deskripsi" class="px-2 py-1 border rounded text-xs flex-grow">
+                            <button onclick="app.addSkinTone()" class="btn-coquette px-3 py-1 text-xs font-semibold">Tambah</button>
+                        </div>
+                    `;
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `<div class="text-xs text-coquette-400 p-4 text-center">Kelola data ${this.activeAdminTab} dapat disesuaikan pada LocalStorage secara penuh.</div>`;
+                }
+            }
+
+            addSkinTone() {
+                const name = document.getElementById('newStName').value;
+                const desc = document.getElementById('newStDesc').value;
+                if (name && desc) {
+                    this.db.skinTones.push({ id: name.toLowerCase(), name, desc });
+                    this.saveDatabase();
+                    this.renderAdminEditor();
+                    this.updateAdminStats();
+                }
+            }
+
+            deleteSkinTone(idx) {
+                this.db.skinTones.splice(idx, 1);
+                this.saveDatabase();
+                this.renderAdminEditor();
+                this.updateAdminStats();
+            }
+
+            /* ==================== CAMERA & PHOTO FALLBACK ENGINE ==================== */
+
+            async startCameraProcess() {
+                this.navigateTo('camera');
+                const videoEl = document.getElementById('webcam');
+                const previewImg = document.getElementById('previewImg');
+                const statusIcon = document.getElementById('statusIcon');
+                const statusText = document.getElementById('statusText');
+                const btn = document.getElementById('btnScanColors');
+                const btnSwitch = document.getElementById('btnSwitchCam');
+
+                if (previewImg) previewImg.classList.add('hidden');
+                if (videoEl) videoEl.classList.remove('hidden');
+
+                // Stop existing stream if active
+                this.stopCamera();
+
+                // Check browser mediaDevices support
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    this.showCameraFallback("Akses kamera tidak didukung di browser ini. Silakan gunakan tombol Unggah Foto!");
+                    return;
+                }
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: this.facingMode },
+                        audio: false
+                    });
+                    this.webcamStream = stream;
+                    videoEl.srcObject = stream;
+                    await videoEl.play().catch(() => {});
+
+                    this.faceDetected = true;
+                    statusIcon.className = "fa-solid fa-heart text-coquette-500 animate-bounce";
+                    statusText.innerText = "Kamera aktif ♡ Siap menganalisis!";
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.classList.add('animate-pulse');
+
+                    if (btnSwitch) btnSwitch.classList.remove('hidden');
+                } catch (err) {
+                    console.warn("Akses kamera tidak dapat diaktifkan:", err);
+                    let errMessage = "Kamera tidak dapat diakses. Silakan gunakan tombol Unggah Foto atau Foto Sampel!";
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        errMessage = "Izin kamera ditolak/diblokir. Berikan izin di browser atau gunakan Unggah Foto!";
+                    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                        errMessage = "Perangkat kamera tidak ditemukan. Silakan unggah foto dari galeri!";
+                    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                        errMessage = "Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut atau unggah foto!";
+                    }
+                    this.showCameraFallback(errMessage);
+                }
+            }
+
+            async switchCamera() {
+                this.facingMode = this.facingMode === 'user' ? 'environment' : 'user';
+                await this.startCameraProcess();
+            }
+
+            showCameraFallback(message) {
+                const statusIcon = document.getElementById('statusIcon');
+                const statusText = document.getElementById('statusText');
+                const btnSwitch = document.getElementById('btnSwitchCam');
+
+                if (statusIcon) statusIcon.className = "fa-solid fa-circle-exclamation text-rose-500";
+                if (statusText) statusText.innerText = message;
+                if (btnSwitch) btnSwitch.classList.add('hidden');
+            }
+
+            stopCamera() {
+                if (this.webcamStream) {
+                    this.webcamStream.getTracks().forEach(track => track.stop());
+                    this.webcamStream = null;
+                }
+            }
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.setPhotoPreview(e.target.result, "Foto berhasil diunggah ♡ Siap dianalisis!");
+                };
+                reader.readAsDataURL(file);
+            }
+
+            useDemoPhoto() {
+                // High resolution coquette girl face sample placeholder for demo
+                const demoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="400" height="400" fill="%23FFE3E8"/><circle cx="200" cy="180" r="100" fill="%23F2C8A8"/><circle cx="160" cy="170" r="12" fill="%234A3E3D"/><circle cx="240" cy="170" r="12" fill="%234A3E3D"/><ellipse cx="160" cy="195" rx="15" ry="8" fill="%23F4618E" opacity="0.4"/><ellipse cx="240" cy="195" rx="15" ry="8" fill="%23F4618E" opacity="0.4"/><path d="M 180 220 Q 200 240 220 220" stroke="%23E63973" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M 100 130 Q 200 50 300 130 Q 330 250 300 320 Q 200 300 100 320 Q 70 250 100 130 Z" fill="%235C3A21" opacity="0.85"/></svg>`;
+                this.setPhotoPreview(demoSvg, "Foto sampel demo dimuat ♡ Siap dianalisis!");
+            }
+
+            setPhotoPreview(imageSrc, statusMessage) {
+                const videoEl = document.getElementById('webcam');
+                const previewImg = document.getElementById('previewImg');
+                const statusIcon = document.getElementById('statusIcon');
+                const statusText = document.getElementById('statusText');
+                const btn = document.getElementById('btnScanColors');
+
+                if (this.webcamStream) this.stopCamera();
+                if (videoEl) videoEl.classList.add('hidden');
+
+                previewImg.src = imageSrc;
+                previewImg.classList.remove('hidden');
+
+                this.faceDetected = true;
+                statusIcon.className = "fa-solid fa-heart text-coquette-500 animate-bounce";
+                statusText.innerText = statusMessage;
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.classList.add('animate-pulse');
+            }
+
+            /* ==================== SCAN ANALYSIS ENGINE ==================== */
+
+            executeScanAnalysis() {
+                const overlay = document.getElementById('scanOverlay');
+                const scanLine = document.getElementById('scanLine');
+                const progressText = document.getElementById('scanProgressText');
+                const progressBar = document.getElementById('scanProgressBar');
+
+                overlay.classList.remove('hidden');
+                scanLine.classList.remove('hidden');
+
+                const steps = [
+                    { percent: 25, text: "Scanning your natural colors..." },
+                    { percent: 50, text: "Finding your undertone..." },
+                    { percent: 75, text: "Discovering your color personality..." },
+                    { percent: 100, text: "Creating your signature palette..." }
+                ];
+
+                let idx = 0;
+                const timer = setInterval(() => {
+                    if (idx < steps.length) {
+                        progressBar.style.width = `${steps[idx].percent}%`;
+                        progressText.innerText = steps[idx].text;
+                        idx++;
+                    } else {
+                        clearInterval(timer);
+                        setTimeout(() => {
+                            overlay.classList.add('hidden');
+                            scanLine.classList.add('hidden');
+                            this.generateColorAnalysisResult();
+                        }, 500);
+                    }
+                }, 600);
+            }
+
+            generateColorAnalysisResult() {
+                const video = document.getElementById('webcam');
+                const previewImg = document.getElementById('previewImg');
+                const canvas = document.getElementById('canvasFrame');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 100;
+                canvas.height = 100;
+
+                try {
+                    if (previewImg && !previewImg.classList.contains('hidden')) {
+                        ctx.drawImage(previewImg, 0, 0, 100, 100);
+                    } else if (video && video.srcObject) {
+                        ctx.drawImage(video, 0, 0, 100, 100);
+                    } else {
+                        ctx.fillStyle = '#f2c8a8';
+                        ctx.fillRect(0, 0, 100, 100);
+                    }
+                } catch(e) {
+                    console.log("Canvas sampling fallback activated.");
+                }
+
+                const pixelData = ctx.getImageData(50, 50, 1, 1).data;
+                const r = pixelData[0], g = pixelData[1], b = pixelData[2];
+
+                // Map sampled pixel to undertone key
+                let undertoneKey = 'COOL';
+                if (r > g && g > b && (r - b) > 25) {
+                    undertoneKey = 'WARM';
+                } else if (Math.abs(r - g) < 20) {
+                    undertoneKey = 'NEUTRAL';
+                }
+
+                const tones = ['Light', 'Medium', 'Tan'];
+                const selectedTone = tones[Math.floor(Math.random() * tones.length)];
+                const undertoneData = this.db.undertones[undertoneKey];
+
+                this.userAnalysis = {
+                    skinTone: selectedTone,
+                    undertoneKey: undertoneKey,
+                    undertone: undertoneData
+                };
+
+                // Populate Result View UI
+                document.getElementById('resSkinTone').innerText = selectedTone;
+                document.getElementById('resUndertone').innerText = undertoneData.name;
+                document.getElementById('resUndertoneDesc').innerText = undertoneData.desc;
+                document.getElementById('resSeason').innerText = undertoneData.season;
+                document.getElementById('resSeasonDesc').innerText = undertoneData.seasonDesc;
+
+                // Populate Characteristics & Signature
+                const charList = document.getElementById('resCharacteristicsList');
+                charList.innerHTML = undertoneData.characteristics.map(c => `<li><i class="fa-solid fa-check text-coquette-500 mr-2"></i>${c}</li>`).join('');
+                document.getElementById('resSignatureText').innerText = `"${undertoneData.signature}"`;
+
+                // Render Swatches
+                const swatchesGrid = document.getElementById('resPaletteSwatches');
+                swatchesGrid.innerHTML = undertoneData.palette.map(p => `
+                    <div class="bg-white p-2.5 rounded-2xl border border-coquette-200 text-center shadow-sm hover:scale-105 transition-transform">
+                        <div class="w-full h-12 rounded-xl mb-2 border border-black/10" style="background-color: ${p.hex};"></div>
+                        <div class="font-bold text-xs text-coquette-600 truncate">${p.name}</div>
+                        <div class="text-[10px] text-coquette-400 font-mono">${p.hex}</div>
+                    </div>
+                `).join('');
+
+                this.switchRecTab('outfit');
+                this.navigateTo('result');
+            }
+
+            switchRecTab(tab) {
+                this.activeRecTab = tab;
+                document.querySelectorAll('.rec-tab-btn').forEach(btn => {
+                    btn.classList.remove('bg-coquette-500', 'text-white');
+                    btn.classList.add('bg-coquette-100', 'text-coquette-600');
+                });
+                const activeBtn = document.getElementById(`tabBtn-${tab}`);
+                if (activeBtn) {
+                    activeBtn.classList.remove('bg-coquette-100', 'text-coquette-600');
+                    activeBtn.classList.add('bg-coquette-500', 'text-white');
+                }
+
+                const recs = this.userAnalysis.undertone.recommendations;
+                const container = document.getElementById('recTabContainer');
+
+                if (tab === 'outfit') {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-sm text-coquette-600">Rekomendasi Warna Pakaian (Outfit)</h4>
+                            <p class="text-xs text-coquette-text">Pilihan warna baju yang paling memancarkan rona cantik alanimu:</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${recs.outfit.map(o => `<span class="px-3 py-1.5 rounded-full bg-coquette-100 text-coquette-600 border border-coquette-200 text-xs font-medium"><i class="fa-solid fa-shirt text-coquette-400 mr-1"></i>${o}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (tab === 'hijab') {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-sm text-coquette-600">Rekomendasi Warna Hijab</h4>
+                            <p class="text-xs text-coquette-text">Pilihan warna jilbab yang membingkai wajahmu semakin cerah tanpa kusam:</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${recs.hijab.map(h => `<span class="px-3 py-1.5 rounded-full bg-coquette-100 text-coquette-600 border border-coquette-200 text-xs font-medium"><i class="fa-solid fa-vest text-coquette-400 mr-1"></i>${h}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (tab === 'hair') {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-sm text-coquette-600">Rekomendasi Warna Rambut (Hair Color)</h4>
+                            <p class="text-xs text-coquette-text">Pilihan warna cat rambut yang sangat serasi dengan pigmen wajahmu:</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${recs.hair.map(hr => `<span class="px-3 py-1.5 rounded-full bg-coquette-100 text-coquette-600 border border-coquette-200 text-xs font-medium"><i class="fa-solid fa-scissors text-coquette-400 mr-1"></i>${hr}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (tab === 'makeup') {
+                    container.innerHTML = `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                                <strong class="text-coquette-600 block mb-1"><i class="fa-solid fa-wand-magic mr-1"></i>Lipstick:</strong>
+                                ${recs.makeup.lipstick}
+                            </div>
+                            <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                                <strong class="text-coquette-600 block mb-1"><i class="fa-solid fa-heart mr-1"></i>Blush On:</strong>
+                                ${recs.makeup.blush}
+                            </div>
+                            <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                                <strong class="text-coquette-600 block mb-1"><i class="fa-solid fa-eye mr-1"></i>Eyeshadow:</strong>
+                                ${recs.makeup.eyeshadow}
+                            </div>
+                            <div class="bg-coquette-50 p-3 rounded-xl border border-coquette-200">
+                                <strong class="text-coquette-600 block mb-1"><i class="fa-solid fa-face-smile mr-1"></i>Foundation:</strong>
+                                ${recs.makeup.foundation}
+                            </div>
+                        </div>
+                    `;
+                } else if (tab === 'acc') {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-sm text-coquette-600">Rekomendasi Perhiasan & Aksesori</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${recs.accessories.map(a => `<span class="px-3 py-1.5 rounded-full bg-coquette-100 text-coquette-600 border border-coquette-200 text-xs font-medium"><i class="fa-solid fa-gem text-coquette-400 mr-1"></i>${a}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (tab === 'combo') {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-sm text-coquette-600">Perpaduan & Kombinasi Warna Terbaik</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                ${recs.combinations.map(c => `
+                                    <div class="p-3 bg-white rounded-xl border border-coquette-200 text-center">
+                                        <div class="flex h-8 rounded-lg overflow-hidden border mb-2">
+                                            <div class="w-1/2" style="background:${c.hexes[0]}"></div>
+                                            <div class="w-1/2" style="background:${c.hexes[1]}"></div>
+                                        </div>
+                                        <span class="text-xs font-semibold text-coquette-600">${c.pair[0]} + ${c.pair[1]}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            /* ==================== COLOR CHALLENGE GAME ENGINE ==================== */
+
+            startColorChallenge() {
+                this.challengeIndex = 0;
+                this.challengeScore = 0;
+                this.navigateTo('challenge');
+                this.renderChallengeQuestion();
+            }
+
+            renderChallengeQuestion() {
+                const q = this.db.challenges[this.challengeIndex];
+                const total = this.db.challenges.length;
+
+                document.getElementById('challengeTitle').innerText = `Tantangan Warna #${this.challengeIndex + 1}`;
+                document.getElementById('currentScoreDisplay').innerText = this.challengeScore;
+                document.getElementById('challengeProgressText').innerText = `Tantangan ${this.challengeIndex + 1} / ${total}`;
+                
+                const percent = Math.round(((this.challengeIndex + 1) / total) * 100);
+                document.getElementById('challengePercent').innerText = `${percent}%`;
+                document.getElementById('challengeProgressBar').style.width = `${percent}%`;
+
+                document.getElementById('challengeQuestion').innerText = q.question;
+
+                const optionsContainer = document.getElementById('challengeOptions');
+                optionsContainer.innerHTML = q.options.map((opt, i) => `
+                    <button onclick="app.selectChallengeOption(${i})" class="challenge-opt-btn p-3.5 rounded-2xl border border-coquette-200 bg-white hover:bg-coquette-50 text-left text-xs sm:text-sm font-medium text-coquette-text transition flex items-center justify-between group">
+                        <span>${opt.text}</span>
+                        <i class="fa-regular fa-circle text-coquette-300 group-hover:text-coquette-500"></i>
+                    </button>
+                `).join('');
+
+                const feedback = document.getElementById('challengeFeedback');
+                feedback.classList.add('hidden');
+
+                const btnNext = document.getElementById('btnNextChallenge');
+                btnNext.disabled = true;
+                btnNext.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            selectChallengeOption(optIdx) {
+                const q = this.db.challenges[this.challengeIndex];
+                const selectedOpt = q.options[optIdx];
+                const buttons = document.querySelectorAll('.challenge-opt-btn');
+
+                buttons.forEach(btn => btn.disabled = true);
+
+                const feedback = document.getElementById('challengeFeedback');
+                feedback.classList.remove('hidden');
+
+                if (selectedOpt.correct) {
+                    this.challengeScore += 10;
+                    document.getElementById('currentScoreDisplay').innerText = this.challengeScore;
+                    feedback.className = "p-4 rounded-2xl border mb-6 text-xs sm:text-sm leading-relaxed bg-green-50 border-green-200 text-green-700";
+                    feedback.innerHTML = `<i class="fa-solid fa-circle-check text-green-500 mr-2"></i><strong>Benar! (+10 poin)</strong> ${selectedOpt.exp}`;
+                } else {
+                    feedback.className = "p-4 rounded-2xl border mb-6 text-xs sm:text-sm leading-relaxed bg-rose-50 border-rose-200 text-rose-700";
+                    feedback.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500 mr-2"></i><strong>Kurang tepat (+0 poin).</strong> ${selectedOpt.exp}`;
+                }
+
+                const btnNext = document.getElementById('btnNextChallenge');
+                btnNext.disabled = false;
+                btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            nextChallengeQuestion() {
+                this.challengeIndex++;
+                if (this.challengeIndex < this.db.challenges.length) {
+                    this.renderChallengeQuestion();
+                } else {
+                    this.showFinalScore();
+                }
+            }
+
+            showFinalScore() {
+                this.navigateTo('score');
+                document.getElementById('finalScoreVal').innerText = this.challengeScore;
+
+                let title = "COLOR EXPLORER";
+                let desc = "Kamu telah mengenal dasar-dasar personal color pesonamu!";
+                let icon = "fa-award";
+
+                if (this.challengeScore >= 40) {
+                    title = "PALETTE MASTER ♡";
+                    desc = "Luar biasa! Pengetahuan personal color dan gayamu sangat sempurna!";
+                    icon = "fa-crown";
+                } else if (this.challengeScore >= 20) {
+                    title = "COLOR LOVER";
+                    desc = "Hebat! Kamu sudah sangat memahami kombinasi warna yang serasi.";
+                    icon = "fa-heart";
+                }
+
+                document.getElementById('badgeTitle').innerText = title;
+                document.getElementById('badgeDesc').innerText = desc;
+                document.getElementById('achievementBadge').querySelector('i').className = `fa-solid ${icon}`;
+            }
+
+            showFullSummaryJourney() {
+                this.navigateTo('journey');
+
+                const recs = this.userAnalysis.undertone.recommendations;
+                document.getElementById('sumSkinTone').innerText = this.userAnalysis.skinTone;
+                document.getElementById('sumUndertone').innerText = this.userAnalysis.undertone.name;
+                document.getElementById('sumSeason').innerText = this.userAnalysis.undertone.season;
+                document.getElementById('sumScoreBadge').innerText = `${this.challengeScore}/50`;
+
+                document.getElementById('sumSignature').innerText = `"${this.userAnalysis.undertone.signature}"`;
+
+                document.getElementById('sumOutfitBrief').innerText = recs.outfit.slice(0, 3).join(', ');
+                document.getElementById('sumHijabBrief').innerText = recs.hijab.slice(0, 3).join(', ');
+                document.getElementById('sumHairBrief').innerText = recs.hair.slice(0, 3).join(', ');
+                document.getElementById('sumMakeupBrief').innerText = recs.makeup.lipstick;
+                document.getElementById('sumAccBrief').innerText = recs.accessories.slice(0, 3).join(', ');
+                document.getElementById('sumComboBrief').innerText = `${recs.combinations[0].pair[0]} + ${recs.combinations[0].pair[1]}`;
+            }
+
+            restartGame() {
+                this.startCameraProcess();
+            }
+        }
+
+        // Global app instance startup on window load
+        let app;
+        window.onload = function() {
+            app = new AlyraaApp();
+            app.init();
+        };
+    </script>
+</body>
+</html>
